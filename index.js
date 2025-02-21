@@ -32,6 +32,7 @@ async function run() {
 
     const database = client.db("TaskManagementSystem");
     const userCollection = database.collection("user");
+    const taskCollection=database.collection("tasks")
 
     app.get('/user/:email', async (req, res) => {
         const email = req.params.email;
@@ -59,6 +60,46 @@ async function run() {
       res.send(result)
 
   })
+
+    // Task Routes
+    app.get('/api/tasks', async (req, res) => {
+        const tasks = await taskCollection.find().toArray();
+        res.json(tasks);
+    });
+
+    app.post('/api/tasks', async (req, res) => {
+        const newTask = { ...req.body, timestamp: new Date(), category: 'To-Do' };
+        const result = await taskCollection.insertOne(newTask);
+        res.json({ _id: result.insertedId, ...newTask });
+    });
+
+    app.put('/api/tasks/:id', async (req, res) => {
+        const { id } = req.params;
+        const updatedTask = await taskCollection.findOneAndUpdate(
+            { _id: new MongoClient.ObjectId(id) },
+            { $set: req.body },
+            { returnOriginal: false }
+        );
+        res.json(updatedTask.value);
+    });
+
+    app.delete('/api/tasks/:id', async (req, res) => {
+        const { id } = req.params;
+        await taskCollection.deleteOne({ _id: new MongoClient.ObjectId(id) });
+        res.sendStatus(204);
+    });
+
+    app.put('/api/tasks/reorder', async (req, res) => {
+        const tasks = req.body;
+        await Promise.all(tasks.map(task => 
+            taskCollection.updateOne(
+                { _id: new MongoClient.ObjectId(task._id) },
+                { $set: task }
+            )
+        ));
+        res.sendStatus(204);
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
